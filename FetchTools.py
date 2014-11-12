@@ -30,7 +30,7 @@ def MakeDir(path):
         os.mkdir(path);
 def MakeTmpDir():
     MakeDir(GetTmpDir());
-def make_xcrun_call(call_args):
+def make_subprocess_call(call_args):
     error = 0
     output = ''
     try:
@@ -43,7 +43,7 @@ def make_xcrun_call(call_args):
     return (output, error)
 def resolve_sdk_path():
     platform_path = '';
-    xcrun_result = make_xcrun_call(('xcrun', '--show-sdk-path'));
+    xcrun_result = make_subprocess_call(('xcrun', '--show-sdk-path'));
     if xcrun_result[1] != 0:
         v_log('Please run Xcode first!',0, kVerboseLogLevel);
         sys.exit();
@@ -51,14 +51,21 @@ def resolve_sdk_path():
     platform_path = xcrun_result[0].rstrip('\n');
     return platform_path;
 def CompileCLILoader(path):
+    full_path = os.path.join(path, os.listdir(path)[0]);
+    os.chdir(full_path);
     sdk_path = resolve_sdk_path();
-    xcrun_result = make_xcrun_call(('xcrun', 'cc', '-O2', '-Wall', '-DUSE_APPLE_IOKIT', '-isysroot', sdk_path, '-o', 'teensy_loader_cli', 'teensy_loader_cli.c', '-Wl', '-syslibroot', sdk_path, '-framework', 'IOKit', '-framework', 'CoreFoundation'));
+    xcrun_result = make_subprocess_call(('xcrun', 'cc', '-O2', '-Wall', '-DUSE_APPLE_IOKIT', '-isysroot', sdk_path, '-o', 'teensy_loader_cli', 'teensy_loader_cli.c', '-framework', 'IOKit', '-framework', 'CoreFoundation'));
     if xcrun_result[1] != 0:
-        v_log('Please run Xcode first!',0, kVerboseLogLevel);
+        print 'Please run Xcode first!';
         sys.exit();
     
     compiler_output = xcrun_result[0].rstrip('\n');
-    return compiler_output;
+    if not 'error' in compiler_output:
+        return os.path.join(full_path, 'teensy_loader_cli');
+    else:
+        print compiler_output;
+        print 'Compiler error!';
+        sys.exit();
 def DownloadFile(address, name):
     fd = urllib2.urlopen(address);
     fd_name = os.path.join(GetTmpDir(), name);
@@ -85,17 +92,34 @@ def MountDiskImage(file):
     path = os.path.join(GetTmpDir(), file);
     DMGMOUNTER = DMGMounter.DmgMounter();
     MOUNTPOINT = DMGMOUNTER.mount(path);
-    print MOUNTPOINT;
+    return MOUNTPOINT;
 # Main
 def main(argv):
     MakeTmpDir();
-    #DownloadAddressToFile(Arduino_zip_address, Arduino_zip);
-    UnzipPathToFile(Arduino_zip);
-    #DownloadAddressToFile(Teensyduino_dmg_address, Teensyduino_dmg);
-    MountDiskImage(Teensyduino_dmg);
-    #DownloadAddressToFile(CLI_zip_address, CLI_zip);
-    UnzipPathToFile(CLI_zip);
-
+    # Downloading necessary tools
+    DownloadAddressToFile(Arduino_zip_address, Arduino_zip);
+    DownloadAddressToFile(Teensyduino_dmg_address, Teensyduino_dmg);
+    DownloadAddressToFile(CLI_zip_address, CLI_zip);
+    
+    # Unpacking tools
+    arduino_extracted_path = UnzipPathToFile(Arduino_zip);
+    teensyduino_mount_path = MountDiskImage(Teensyduino_dmg);
+    cli_extracted_path = UnzipPathToFile(CLI_zip);
+    
+    # copy arduino-xcode.app to /Applications
+    shutil.copytree(os.path.join(arduino_extracted_path,'Arduino.app'),'/Applications/Arduino-Xcode.app');
+    
+    # run teensyduino installer
+    run_teensyduino_installer = make_subprocess_call(('open', os.path.join(teensyduino_mount_path, 'teensyduino.app')));
+    
+    # Compile loader
+    loader_path = CompileCLILoader(cli_extracted_path);
+    
+    # copy tools
+    
+    
+    # remove arduino-xcode.app from /Applications
+    
 
 if __name__ == "__main__":
     main(sys.argv[1:]);
