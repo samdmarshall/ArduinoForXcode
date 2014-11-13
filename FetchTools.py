@@ -92,34 +92,49 @@ def MountDiskImage(file):
     path = os.path.join(GetTmpDir(), file);
     DMGMOUNTER = DMGMounter.DmgMounter();
     MOUNTPOINT = DMGMOUNTER.mount(path);
-    return MOUNTPOINT;
+    return (DMGMOUNTER, MOUNTPOINT);
 # Main
 def main(argv):
     MakeTmpDir();
-    # Downloading necessary tools
+    # Downloading necessary tools, check if necessary
     DownloadAddressToFile(Arduino_zip_address, Arduino_zip);
     DownloadAddressToFile(Teensyduino_dmg_address, Teensyduino_dmg);
     DownloadAddressToFile(CLI_zip_address, CLI_zip);
     
     # Unpacking tools
     arduino_extracted_path = UnzipPathToFile(Arduino_zip);
-    teensyduino_mount_path = MountDiskImage(Teensyduino_dmg);
+    teensyduino_mount_info = MountDiskImage(Teensyduino_dmg);
     cli_extracted_path = UnzipPathToFile(CLI_zip);
     
     # copy arduino-xcode.app to /Applications
     shutil.copytree(os.path.join(arduino_extracted_path,'Arduino.app'),'/Applications/Arduino-Xcode.app');
     
+    # copy teensyduino.app
+    tmp_teensyduino = os.path.join(GetTmpDir(), 'teensyduino.app');
+    shutil.copytree(os.path.join(teensyduino_mount_info[1], 'teensyduino.app'), tmp_teensyduino);
+    
+    # unmount teensyduino.dmg
+    teensyduino_mount_info[0].unmount(os.path.join(GetTmpDir(), Teensyduino_dmg));
+    
     # run teensyduino installer
-    run_teensyduino_installer = make_subprocess_call(('open', os.path.join(teensyduino_mount_path, 'teensyduino.app')));
+    run_teensyduino_installer = make_subprocess_call(('open', tmp_teensyduino));
     
     # Compile loader
     loader_path = CompileCLILoader(cli_extracted_path);
+    
+    # wait until complete
+    raw_input('Waiting until teensyduino has finished installing, press any key to continue...');
     
     # copy tools
     
     
     # remove arduino-xcode.app from /Applications
+    shutil.rmtree('/Applications/Arduino-Xcode.app');
     
+    # clean up ./tmp
+    shutil.rmtree(tmp_teensyduino);
+    shutil.rmtree(arduino_extracted_path);
+    shutil.rmtree(cli_extracted_path);
 
 if __name__ == "__main__":
     main(sys.argv[1:]);
