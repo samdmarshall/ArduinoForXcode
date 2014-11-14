@@ -123,7 +123,8 @@ def main(argv):
     loader_path = CompileCLILoader(cli_extracted_path);
     
     # wait until complete
-    raw_input('Waiting until teensyduino has finished installing, press any key to continue...');
+    print 'The Arduino IDE has been copied to the /Applications folder and is named \"Arduino-Xcode.app\", tell Teensyduino to install to this copy of the Arduino application. The Teensyduino installer is proprietary and must be done manually before the tools can be extracted to the Arduino platform bundle.\n';
+    raw_input('Please wait until teensyduino has finished installing, then press any key to continue...');
     
     # copy tools
     
